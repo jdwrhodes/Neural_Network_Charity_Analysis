@@ -4,6 +4,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler,OneHotEncoder
 import pandas as pd
 import tensorflow as tf
+from tensorflow.keras import callbacks
 
 # Import our input dataset
 attrition_df = pd.read_csv('./resources/HR-Employee-Attrition.csv')
@@ -66,14 +67,70 @@ nn.add(tf.keras.layers.Dense(units=1, activation='sigmoid'))
 
 # Check the structure of the model
 nn.summary()
+
+#%%
+# Import checkpoint dependencies
+import os
+from tensorflow.keras.callbacks import ModelCheckpoint
+
+# Define the checkpoint path and filenames
+os.makedirs("checkpoints/",exist_ok=True)
+checkpoint_path = "checkpoints/weights.{epoch:02d}.hdf5"
+
 # %%
 # Compile the model
-nn.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-# %%
+nn.compile(loss="binary_crossentropy", optimizer="adam", metrics=["accuracy"])
+
+# Create a callback that saves the model's weights every 5 epochs
+cp_callback = ModelCheckpoint(
+    filepath=checkpoint_path,
+    verbose=1,
+    save_weights_only=True,
+    save_freq=100)
+
 # Train the model
-fit_model =nn.fit(X_train, y_train, epochs=100)
+fit_model = nn.fit(X_train_scaled,y_train,epochs=100,callbacks=[cp_callback])
+
+# Evaluate the model using the test data
+model_loss, model_accuracy = nn.evaluate(X_test_scaled,y_test,verbose=2)
+print(f"Loss: {model_loss}, Accuracy: {model_accuracy}")
+
+#%%
+# Define the model - deep neural net
+number_input_features = len(X_train_scaled[0])
+hidden_nodes_layer1 =  8
+hidden_nodes_layer2 = 5
+
+nn_new = tf.keras.models.Sequential()
+
+# First hidden layer
+nn_new.add(
+    tf.keras.layers.Dense(units=hidden_nodes_layer1, input_dim=number_input_features, activation="relu")
+)
+
+# Second hidden layer
+nn_new.add(tf.keras.layers.Dense(units=hidden_nodes_layer2, activation="relu"))
+
+# Output layer
+nn_new.add(tf.keras.layers.Dense(units=1, activation="sigmoid"))
+
+# Compile the model
+nn_new.compile(loss="binary_crossentropy", optimizer="adam", metrics=["accuracy"])
+
+# Restore the model weights
+nn_new.load_weights("checkpoints/weights.100.hdf5")
+
+# Evaluate the model using the test data
+model_loss, model_accuracy = nn_new.evaluate(X_test_scaled,y_test,verbose=2)
+print(f"Loss: {model_loss}, Accuracy: {model_accuracy}")
+# %%
+# Export our model to HDF5 file
+nn_new.save('trained_attrition.h5')
+# %%
+# Import the model to a new object
+nn_imported = tf.keras.models.load_model('trained_attrition.h5')
 # %%
 # Evaluate the model using the test data
-model_loss, model_accuracy = nn.evaluate(X_test, y_test, verbose=2)
-print(f'Loss: {model_loss}, Accuracy: {model_accuracy}')
+model_loss, model_accuracy = nn_new.evaluate(X_test_scaled, y_test, verbose=2)
+print(f"Loss: {model_loss}, Accuracy: {model_accuracy}")
 # %%
